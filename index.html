@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <link rel="stylesheet" href="style.css">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Biblioteka audio</title>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Piotr Koch 2b gr 2</h1>
+        </div>
+        <div class="content">
+            <div class="filter-container">
+                <label for="genreSelect">Gatunek:</label>
+                <select id="genreSelect"></select>
+                <label for="tempoSelect">Tempo:</label>
+                <select id="tempoSelect">
+                    <option value="slow">Wolne (&lt; 110 BPM)</option>
+                    <option value="medium">Średnie (110-130 BPM)</option>
+                    <option value="fast">Szybkie (&gt; 130 BPM)</option>
+                    <option value="all">Wszystkie</option>
+                </select>
+                <label for="searchInput">Wyszukaj:</label>
+                <input type="text" id="searchInput" placeholder="Wpisz frazę...">
+                <label for="favoriteToggle">Ulubione:</label>
+                <input type="checkbox" id="favoriteToggle">
+                <label for="sortSelect">Sortuj według długości:</label>
+                <select id="sortSelect">
+                    <option value="asc">Rosnąco</option>
+                    <option value="desc">Malejąco</option>
+                    <option value="all2">Losowo</option>
+                </select>
+                <button onclick="applyFilters()">Filtruj i Sortuj</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tytuł</th>
+                            <th>Artysta</th>
+                            <th>Gatunek</th>
+                            <th>Tempo (BPM)</th>
+                            <th>Czas trwania</th>
+                            <th>Ulubione</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    <script>
+        const SongsUrl = 'https://gist.githubusercontent.com/techniadrian/c39f844edbacee0439bfeb107227325b/raw/81eec7847b1b3dfa1c7031586405c93e9a9c1a2d/songs.json';
+        const GenresUrl = 'https://gist.githubusercontent.com/techniadrian/6ccdb1c837d431bb84c2dfedbec2e435/raw/60783ebfa89c6fd658aaf556b9f7162553ac0729/genres.json';
+
+        let songsData = [];
+        let genresData = [];
+        let filteredSongs = [];
+
+        async function fetchData() {
+            const [songsResponse, genresResponse] = await Promise.all([
+                fetch(SongsUrl),
+                fetch(GenresUrl)
+            ]);
+
+            songsData = await songsResponse.json();
+            genresData = await genresResponse.json();
+            //mozliwe ze zle zrobilem ale nie wiem jak to naprawic
+            songsData = songsData.map(song => ({ ...song, favorite: false }));
+            filteredSongs = songsData;
+            //
+            populateGenreSelect();
+            updateTable();
+        }
+
+        function populateGenreSelect() {
+            const genreSelect = document.getElementById('genreSelect');
+            genreSelect.innerHTML = '<option value="all">Wszystkie</option>';
+
+            genresData.forEach(genre => {
+                const option = document.createElement('option');
+                option.value = genre;
+                option.textContent = genre;
+                genreSelect.appendChild(option);
+            });
+        }
+
+        function updateTable() {
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = '';
+
+            filteredSongs.forEach(song => {
+                if (!document.getElementById('favoriteToggle').checked || song.favorite) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${song.title}</td>
+                        <td>${song.artists}</td>
+                        <td>${song.genre}</td>
+                        <td>${song.bpm}</td>
+                        <td>${song.duration}</td>
+                        <td>
+                            <button id="favoriteBtn_${song.id}" onclick="toggleFavorite(${song.id})">
+                                ${song.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+            });
+        }
+        // do naprawy idk czemu nie dziala :(
+        function toggleFavorite(songId) {
+            const song = songsData.find(song => song.id === songId);
+            if (song) {
+                song.favorite = !song.favorite;
+                updateTable();
+            }
+        }
+     //
+        function applyFilters() {
+            const genreSelect = document.getElementById('genreSelect');
+            const tempoSelect = document.getElementById('tempoSelect');
+            const searchInput = document.getElementById('searchInput');
+            const sortSelect = document.getElementById('sortSelect');
+
+            const selectedGenre = genreSelect.value;
+            const selectedTempo = tempoSelect.value;
+            const searchQuery = searchInput.value.toLowerCase();
+
+            filteredSongs = songsData.filter(song => {
+                const matchesGenre = selectedGenre === 'all' || song.genre === selectedGenre;
+                const matchesTempo = checkTempo(song.bpm, selectedTempo);
+                const matchesSearch = song.title.toLowerCase().includes(searchQuery) || song.artists.toLowerCase().includes(searchQuery);
+
+                return matchesGenre && matchesTempo && matchesSearch;
+            });
+
+            if (sortSelect.value === 'asc') {
+                filteredSongs.sort((a, b) => a.duration - b.duration);
+            } else if (sortSelect.value === 'desc') {
+                filteredSongs.sort((a, b) => b.duration - a.duration);
+            } else if (sortSelect.value === 'all2') {
+                filteredSongs.sort((a, b) => Math.random() - 0.5);
+            }
+
+            updateTable();
+        }
+
+        function checkTempo(bpm, selectedTempo) {
+            if (selectedTempo === 'slow') {
+                return bpm < 110;
+            } else if (selectedTempo === 'medium') {
+                return bpm >= 110 && bpm <= 130;
+            } else if (selectedTempo === 'fast') {
+                return bpm > 130;
+            } else if (selectedTempo === 'all') {
+                return true;
+            }
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
